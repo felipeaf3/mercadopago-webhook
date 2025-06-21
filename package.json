@@ -1,0 +1,12 @@
+{
+  "name": "mercadopago-webhook",
+  "version": "1.0.0",
+  "main": "api/mercadopago-webhook.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "type": "module"
+}
