@@ -1,42 +1,45 @@
-import fetch from 'node-fetch';
-
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ message: "Method Not Allowed" });
-  }
-
-  const accessToken = process.env.MP_ACCESS_TOKEN;
-  const wixFunctionUrl = process.env.WIX_HTTP_FUNCTION_URL;
-
-  try {
-    const body = req.body;
-    const paymentId = body.data.id;
-
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
+  if (req.method === "POST") {
+    try {
+      const paymentId = req.body.data?.id;
+      if (!paymentId) {
+        console.error("paymentId não recebido");
+        return res.status(400).send("No payment id");
       }
-    });
 
-    const payment = await response.json();
+      // Busca detalhes do pagamento na API do Mercado Pago
+      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
+        }
+      });
+      const payment = await mpRes.json();
 
-    const numeroPedido = payment.external_reference;
-    const status = payment.status;
+      const externalReference = payment.external_reference;
+      const status = payment.status;
 
-    console.log(`Pagamento recebido: ${paymentId} | Pedido: ${numeroPedido} | Status: ${status}`);
+      console.log(`Pagamento recebido | Pedido: ${externalReference} | Status: ${status}`);
 
-    await fetch(wixFunctionUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        numeroPedido: Number(numeroPedido),
-        status: status
-      })
-    });
+      // Chama seu HTTP Function no Wix
+      const wixRes = await fetch("https://www.sthevamefelipe.com.br/_functions/updateStatus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          numeroPedido: externalReference,
+          status: status === "approved" ? "pago" : "pendente"
+        })
+      });
 
-    res.status(200).json({ received: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+      const wixJson = await wixRes.json();
+      console.log("Resposta do Wix:", wixJson);
+
+      return res.status(200).send("OK");
+    } catch (err) {
+      console.error("Erro:", err);
+      return res.status(500).send(err.message);
+    }
+  } else {
+    res.status(405).send("Method Not Allowed");
   }
 }
