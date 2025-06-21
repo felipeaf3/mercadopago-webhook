@@ -1,26 +1,43 @@
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
-      // Padrão UNIVERSAL: tenta várias chaves
-      const paymentId = req.body.data?.id || req.body.resource?.id || req.body.id;
-      if (!paymentId) {
-        console.error("paymentId não recebido");
-        return res.status(400).send("No payment id");
+      // Tenta detectar tipo do evento
+      const topic = req.body.type || req.body.topic || "unknown";
+      let resourceId =
+        req.body.data?.id ||
+        req.body.resource?.id ||
+        req.body.id ||
+        null;
+
+      if (!resourceId) {
+        console.error("resourceId não recebido");
+        return res.status(400).send("No resource id");
       }
 
-      // Busca detalhes do pagamento na API do Mercado Pago
-      const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      let apiUrl = "";
+      if (topic.includes("payment")) {
+        apiUrl = `https://api.mercadopago.com/v1/payments/${resourceId}`;
+      } else if (topic.includes("merchant_order")) {
+        apiUrl = `https://api.mercadopago.com/merchant_orders/${resourceId}`;
+      } else {
+        console.error("Tipo de evento desconhecido:", topic);
+        return res.status(400).send("Tipo de evento não suportado");
+      }
+
+      // Busca detalhes na API do MP
+      const mpRes = await fetch(apiUrl, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`
         }
       });
-      const payment = await mpRes.json();
+      const mpData = await mpRes.json();
 
-      const externalReference = payment.external_reference;
-      const status = payment.status;
+      // Determina external_reference e status com fallback
+      let externalReference = mpData.external_reference || mpData.preference_id || mpData.id || null;
+      let status = mpData.status || mpData.order_status || "unknown";
 
-      console.log(`Pagamento recebido | Pedido: ${externalReference} | Status: ${status}`);
+      console.log(`Evento: ${topic} | Pedido: ${externalReference} | Status: ${status}`);
 
       // Chama seu HTTP Function no Wix
       const wixRes = await fetch("https://www.sthevamefelipe.com.br/_functions/updateStatus", {
@@ -32,7 +49,7 @@ export default async function handler(req, res) {
         })
       });
 
-      // Blindagem PRO: lê body UMA vez como texto e tenta parsear
+      // Blindagem PRO: lê body uma única vez como texto e tenta parsear
       const rawBody = await wixRes.text();
       let wixJson;
       try {
