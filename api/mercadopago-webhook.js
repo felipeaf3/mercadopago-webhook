@@ -31,12 +31,13 @@ export default async function handler(req, res) {
         })
       });
 
-      // Tenta parsear como JSON, senão pega como texto cru
+      // Blindagem: lê o body UMA vez como texto, tenta parsear, fallback para texto cru
+      const rawBody = await wixRes.text();
       let wixJson;
       try {
-        wixJson = await wixRes.json();
+        wixJson = JSON.parse(rawBody);
       } catch {
-        wixJson = { raw: await wixRes.text() };
+        wixJson = { raw: rawBody };
       }
       console.log("Resposta do Wix:", wixJson);
 
