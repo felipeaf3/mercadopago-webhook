@@ -1,7 +1,8 @@
 export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
-      const paymentId = req.body.data?.id;
+      // Padrão UNIVERSAL: tenta várias chaves
+      const paymentId = req.body.data?.id || req.body.resource?.id || req.body.id;
       if (!paymentId) {
         console.error("paymentId não recebido");
         return res.status(400).send("No payment id");
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
         })
       });
 
-      // Blindagem: lê o body UMA vez como texto, tenta parsear, fallback para texto cru
+      // Blindagem PRO: lê body UMA vez como texto e tenta parsear
       const rawBody = await wixRes.text();
       let wixJson;
       try {
