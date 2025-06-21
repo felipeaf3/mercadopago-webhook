@@ -27,11 +27,17 @@ export default async function handler(req, res) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numeroPedido: externalReference,
-          status: status === "approved" ? "pago" : "pendente"
+          status: status === "approved" ? "pago" : status
         })
       });
 
-      const wixJson = await wixRes.json();
+      // Tenta parsear como JSON, senão pega como texto cru
+      let wixJson;
+      try {
+        wixJson = await wixRes.json();
+      } catch {
+        wixJson = { raw: await wixRes.text() };
+      }
       console.log("Resposta do Wix:", wixJson);
 
       return res.status(200).send("OK");
