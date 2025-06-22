@@ -21,9 +21,19 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${process.env.MP_TOKEN}`
         }
       });
-      const paymentData = await paymentResp.json();
-      numeroPedido = paymentData.external_reference;
-      status = paymentData.status;
+
+      const paymentTexto = await paymentResp.text();
+      console.log("Raw Payment Response:", paymentTexto);
+
+      let paymentData = {};
+      try {
+        paymentData = JSON.parse(paymentTexto);
+      } catch (e) {
+        console.error("Erro parse Payment JSON:", e);
+      }
+
+      numeroPedido = paymentData.external_reference || "";
+      status = paymentData.status || "";
 
       console.log(`Payment: Pedido ${numeroPedido} | Status: ${status}`);
 
@@ -33,17 +43,28 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${process.env.MP_TOKEN}`
         }
       });
-      const orderData = await orderResp.json();
-      numeroPedido = orderData.external_reference;
-      status = orderData.status;
+
+      const orderTexto = await orderResp.text();
+      console.log("Raw Order Response:", orderTexto);
+
+      let orderData = {};
+      try {
+        orderData = JSON.parse(orderTexto);
+      } catch (e) {
+        console.error("Erro parse Order JSON:", e);
+      }
+
+      numeroPedido = orderData.external_reference || "";
+      status = orderData.status || "";
 
       console.log(`Merchant Order: Pedido ${numeroPedido} | Status: ${status}`);
+
     } else {
       console.log("Evento não tratado:", topic);
       return res.status(200).json({ msg: "Evento ignorado" });
     }
 
-    // ✅ Aqui é o ajuste FINAL: chama o Wix e usa .text() para nunca quebrar
+    // ✅ Chama o Wix com .text() também
     if (status === "approved" || status === "closed") {
       const wixResp = await fetch(process.env.WIX_FUNCTION_URL, {
         method: "POST",
