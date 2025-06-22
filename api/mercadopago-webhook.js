@@ -1,4 +1,3 @@
-
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
@@ -8,7 +7,6 @@ export default async function handler(req, res) {
     }
 
     const body = req.body;
-
     const topic = body.topic || body.type || "";
     const data = body.data || {};
     const paymentId = data.id || "";
@@ -26,6 +24,9 @@ export default async function handler(req, res) {
       const paymentData = await paymentResp.json();
       numeroPedido = paymentData.external_reference;
       status = paymentData.status;
+
+      console.log(`Payment: Pedido ${numeroPedido} | Status: ${status}`);
+
     } else if (topic === "merchant_order") {
       const orderResp = await fetch(`https://api.mercadopago.com/merchant_orders/${paymentId}`, {
         headers: {
@@ -35,29 +36,32 @@ export default async function handler(req, res) {
       const orderData = await orderResp.json();
       numeroPedido = orderData.external_reference;
       status = orderData.status;
+
+      console.log(`Merchant Order: Pedido ${numeroPedido} | Status: ${status}`);
     } else {
       console.log("Evento não tratado:", topic);
       return res.status(200).json({ msg: "Evento ignorado" });
     }
 
-    console.log(`Pedido: ${numeroPedido} | Status: ${status}`);
-
+    // ✅ Aqui é o ajuste FINAL: chama o Wix e usa .text() para nunca quebrar
     if (status === "approved" || status === "closed") {
       const wixResp = await fetch(process.env.WIX_FUNCTION_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           numeroPedido: numeroPedido,
-          status: "pago"
-        })
+          status: "aprovado"
+        }),
       });
-      const wixResult = await wixResp.json();
-      console.log("Resposta do Wix:", wixResult);
+
+      const respostaTexto = await wixResp.text();
+      console.log("Resposta do Wix:", respostaTexto);
     }
 
-    res.status(200).json({ success: true });
+    return res.status(200).json({ success: true });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erro no servidor" });
+    console.error("Erro no webhook:", err);
+    return res.status(500).json({ error: "Erro no servidor webhook" });
   }
 }
